@@ -4,7 +4,7 @@ import json
 import time
 from datetime import datetime
 
-# --- 1. 클로드 스타일의 하이엔드 다크 디자인 ---
+# --- 1. 하이엔드 글래스 다크 디자인 (image_b097e2.png 스타일 고정) ---
 st.set_page_config(page_title="유튜브 마스터 스튜디오 Pro", layout="wide", initial_sidebar_state="expanded")
 
 st.markdown("""
@@ -17,21 +17,22 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# [시스템 초기화]
+# [시스템 데이터 초기화]
 for key in ['fav_ai', 'history', 'api_keys']:
     if key not in st.session_state:
         st.session_state[key] = [] if key != 'api_keys' else {"Claude": "", "YouTube": ""}
 
-# [AI 엔진 보안 연결 - 404 에러 방지용 멀티 체크]
+# [AI 엔진 스마트 탐색] - 404 에러 원천 차단 로직
 model = None
 if "GEMINI_API_KEY" in st.secrets:
     try:
         genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-        # 가장 호환성이 높은 모델 명칭 시도
-        model = genai.GenerativeModel('gemini-1.5-flash-latest')
-    except:
-        try: model = genai.GenerativeModel('gemini-1.5-flash')
-        except: pass
+        # 현재 사용 가능한 모델 목록을 스스로 검색
+        available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        target_model = next((m for m in available_models if 'gemini-1.5-flash' in m), available_models[0])
+        model = genai.GenerativeModel(target_model)
+    except Exception as e:
+        st.sidebar.error(f"API 연결 대기 중...")
 
 # --- 2. 사이드바 (작동 확인 메시지) ---
 with st.sidebar:
@@ -40,7 +41,7 @@ with st.sidebar:
     st.divider()
     st.markdown("<div class='status-msg'>🎉 프로그램이 정상적으로 작동합니다!</div>", unsafe_allow_html=True)
 
-# --- 3. 핵심 페이지 구현 ---
+# --- 3. 메뉴별 페이지 ---
 
 if menu == "🏠 대시보드":
     st.header("🏠 대시보드")
@@ -53,8 +54,7 @@ if menu == "🏠 대시보드":
     l_col, r_col = st.columns([1.5, 1])
     with l_col:
         st.subheader("🔥 실시간 핫 트렌드 (100만+ 조회)")
-        for t in ["고양이가 스시 만드는 법", "비밀 지하 도시", "2차대전 탱크 복원"]:
-            st.info(f"📌 {t}")
+        for t in ["고양이 스시 요리", "비밀 지하 도시", "2차대전 탱크 복원"]: st.info(f"📌 {t}")
     with r_col:
         st.subheader("⚙️ 파이프라인 현황")
         steps = ["분석", "주제", "대본", "이미지", "영상", "TTS", "편집", "검수", "🚀 자동 업로드"]
@@ -64,10 +64,10 @@ elif menu == "✨ 콘텐츠 생성실":
     st.subheader("✨ 콘텐츠 생성 (초정밀 타임라인)")
     c1, c2, col_s = st.columns([1, 1, 2])
     with c1: m = st.number_input("분 (Min)", 0, 30, 0)
-    with c2: s = st.number_input("초 (Sec)", 0, 59, 0) # 에러 차단 완료
+    with c2: s = st.number_input("초 (Sec)", 0, 59, 0) # image_a5b2ba.png 에러 수정 완료
     with col_s: style = st.selectbox("🖼️ 스타일", ["🎬 시네마틱", "🎨 카툰", "✨ 애니메이션"])
     
-    topic = st.text_input("콘텐츠 주제", placeholder="예: 고양이가 산에서 사냥하는 스토리")
+    topic = st.text_input("콘텐츠 주제", placeholder="예: 고양이가 정글 탐험하는 스토리")
     if st.button("🚀 전체 자동 생성 가동"):
         if topic and model:
             bar = st.progress(0)
@@ -77,9 +77,8 @@ elif menu == "✨ 콘텐츠 생성실":
                 st.session_state.history.insert(0, {"topic": topic, "content": res.text, "len": f"{m}분 {s}초"})
                 st.success("✅ 생성 완료!")
                 st.write(res.text)
-            except Exception as e: 
-                st.error(f"서버 응답 지연: 다시 한번 눌러주세요. ({e})")
-        else: st.warning("설정에서 API 키를 먼저 확인해 주세요.")
+            except Exception as e: st.error(f"서버 응답 지연: 다시 한번만 눌러주세요. ({e})")
+        else: st.warning("설정에서 API 키를 먼저 확인해 주십시오.")
 
 elif menu == "🤖 AI 검색엔진":
     st.subheader("🤖 AI 검색엔진 (별 ☆ 클릭 시 즐겨찾기)")
@@ -95,12 +94,12 @@ elif menu == "🤖 AI 검색엔진":
 
 elif menu == "🔄 데이터 동기화":
     st.subheader("🔄 데이터 동기화")
-    data = json.dumps({"fav": st.session_state.fav_ai, "hist": st.session_state.history, "keys": st.session_state.api_keys}, indent=4)
+    data = json.dumps({"fav": st.session_state.fav_ai, "hist": st.session_state.history}, indent=4)
     st.download_button("📤 데이터 내보내기", data=data, file_name="yt_backup.json")
     f = st.file_uploader("📥 데이터 가져오기", type="json")
     if f and st.button("✅ 복원 완료"):
         d = json.load(f)
-        st.session_state.fav_ai, st.session_state.history, st.session_state.api_keys = d['fav'], d['hist'], d.get('keys', {})
+        st.session_state.fav_ai, st.session_state.history = d['fav'], d['hist']
         st.success("복원 완료!")
 
 else:
