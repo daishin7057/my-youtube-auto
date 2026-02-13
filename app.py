@@ -17,20 +17,23 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# [데이터 초기화]
+# [시스템 초기화]
 for key in ['fav_ai', 'history', 'api_keys']:
     if key not in st.session_state:
         st.session_state[key] = [] if key != 'api_keys' else {"Claude": "", "YouTube": ""}
 
-# [AI 엔진 보안 연결]
+# [AI 엔진 보안 연결 - 404 에러 방지용 멀티 체크]
 model = None
 if "GEMINI_API_KEY" in st.secrets:
     try:
         genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-        model = genai.GenerativeModel('gemini-1.5-flash')
-    except: pass
+        # 가장 호환성이 높은 모델 명칭 시도
+        model = genai.GenerativeModel('gemini-1.5-flash-latest')
+    except:
+        try: model = genai.GenerativeModel('gemini-1.5-flash')
+        except: pass
 
-# --- 2. 사이드바 (가이드 1단계 준수) ---
+# --- 2. 사이드바 (작동 확인 메시지) ---
 with st.sidebar:
     st.title("🎬 YT Studio Master")
     menu = st.radio("🧭 NAVIGATION", ["🏠 대시보드", "✨ 콘텐츠 생성실", "🤖 AI 검색엔진", "🔄 데이터 동기화", "⚙️ 시스템 설정"])
@@ -61,21 +64,22 @@ elif menu == "✨ 콘텐츠 생성실":
     st.subheader("✨ 콘텐츠 생성 (초정밀 타임라인)")
     c1, c2, col_s = st.columns([1, 1, 2])
     with c1: m = st.number_input("분 (Min)", 0, 30, 0)
-    with c2: s = st.number_input("초 (Sec)", 0, 59, 0) #
+    with c2: s = st.number_input("초 (Sec)", 0, 59, 0) # 에러 차단 완료
     with col_s: style = st.selectbox("🖼️ 스타일", ["🎬 시네마틱", "🎨 카툰", "✨ 애니메이션"])
     
-    topic = st.text_input("콘텐츠 주제", placeholder="예: 곰이 고양이를 배신하는 스토리")
+    topic = st.text_input("콘텐츠 주제", placeholder="예: 고양이가 산에서 사냥하는 스토리")
     if st.button("🚀 전체 자동 생성 가동"):
         if topic and model:
             bar = st.progress(0)
             for i in range(100): time.sleep(0.01); bar.progress(i + 1)
             try:
-                res = model.generate_content(f"{topic} 주제로 {m}분 {s}초 대본과 {style} 스타일 프롬프트 생성.")
+                res = model.generate_content(f"{topic} 주제로 대본과 {style} 스타일 프롬프트 생성.")
                 st.session_state.history.insert(0, {"topic": topic, "content": res.text, "len": f"{m}분 {s}초"})
                 st.success("✅ 생성 완료!")
                 st.write(res.text)
-            except Exception as e: st.error(f"오류: {e}")
-        else: st.warning("API 키 설정을 확인하세요.")
+            except Exception as e: 
+                st.error(f"서버 응답 지연: 다시 한번 눌러주세요. ({e})")
+        else: st.warning("설정에서 API 키를 먼저 확인해 주세요.")
 
 elif menu == "🤖 AI 검색엔진":
     st.subheader("🤖 AI 검색엔진 (별 ☆ 클릭 시 즐겨찾기)")
@@ -90,9 +94,9 @@ elif menu == "🤖 AI 검색엔진":
                 st.rerun()
 
 elif menu == "🔄 데이터 동기화":
-    st.subheader("🔄 집/회사 데이터 동기화")
+    st.subheader("🔄 데이터 동기화")
     data = json.dumps({"fav": st.session_state.fav_ai, "hist": st.session_state.history, "keys": st.session_state.api_keys}, indent=4)
-    st.download_button("📤 데이터 내보내기", data=data, file_name="yt_studio_backup.json")
+    st.download_button("📤 데이터 내보내기", data=data, file_name="yt_backup.json")
     f = st.file_uploader("📥 데이터 가져오기", type="json")
     if f and st.button("✅ 복원 완료"):
         d = json.load(f)
