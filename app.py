@@ -122,3 +122,95 @@ else:
     if f and st.button("✅ 데이터 복구"):
         st.session_state.saved_vault = json.load(f)
         st.success("모든 데이터가 완벽하게 복원되었습니다!")
+import streamlit as st
+import google.generativeai as genai
+import json
+from datetime import datetime
+
+# --- 1. 환경 설정 ---
+st.set_page_config(page_title="YT Studio Pro : 정밀 제어판", layout="wide")
+
+# 프리미엄 다크 테마 CSS
+st.markdown("""
+    <style>
+    .main { background-color: #0e1117; color: #ffffff; }
+    .stSlider [data-baseweb="slider"] { margin-bottom: 2rem; }
+    .stMetric { background-color: #1e2130; padding: 15px; border-radius: 12px; border-left: 5px solid #3b82f6; }
+    </style>
+    """, unsafe_allow_html=True)
+
+# API 인증
+if "GEMINI_API_KEY" in st.secrets:
+    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+    model = genai.GenerativeModel('gemini-1.5-flash')
+
+# 저장소 초기화
+if 'saved_vault' not in st.session_state: st.session_state.saved_vault = []
+if 'fav_ai' not in st.session_state: st.session_state.fav_ai = []
+
+# --- 2. 사이드바 내비게이션 ---
+with st.sidebar:
+    st.title("🎬 YT Studio Pro")
+    menu = st.radio("메뉴", ["🏠 대시보드", "✨ 콘텐츠 생성", "📦 저장고", "🔄 동기화"])
+    st.divider()
+    st.success("🎉 정밀 제어 엔진 가동 중")
+
+# --- 3. 페이지 기능 ---
+
+if menu == "🏠 대시보드":
+    st.header("🏠 대시보드")
+    col1, col2 = st.columns(2)
+    col1.metric("📦 보관 중인 프로젝트", f"{len(st.session_state.saved_vault)}건")
+    col2.metric("📅 마지막 작업일", datetime.now().strftime("%Y-%m-%d"))
+
+elif menu == "✨ 콘텐츠 생성":
+    st.subheader("🎯 초정밀 타임라인 설정") # [cite: 2026-02-13]
+    
+    # 1. 유형 선택
+    c_type = st.radio("제작 유형 선택", ["숏폼 (15초 ~ 60초)", "롱폼 (1분 ~ 30분)"], horizontal=True) # [cite: 2026-02-13]
+    
+    # 2. 대표님이 원하시는 '편한' 시간 설정 [cite: 2026-02-13]
+    if "숏폼" in c_type:
+        # 1초 단위로 정밀 조절
+        total_seconds = st.slider("⏱️ 초 단위 정밀 설정 (Seconds)", 15, 60, 60, step=1)
+        duration_text = f"{total_seconds}초"
+    else:
+        # 분/초를 나눠서 대표님 마음대로 조합 가능
+        col_m, col_s = st.columns(2)
+        m = col_m.number_input("분 (Minutes)", 1, 30, 8)
+        s = col_s.number_input("초 (Seconds)", 0, 59, 0)
+        duration_text = f"{m}분 {s}초"
+    
+    st.info(f"선택된 타임라인: **{duration_text}**") # [cite: 2026-02-13]
+    
+    topic = st.text_input("콘텐츠 주제", placeholder="예: 2차대전 탱크 복원 스토리")
+    
+    if st.button("⚡ 전체 자동 생성 가동"): # [cite: 2026-02-13]
+        if topic:
+            with st.spinner(f"[{duration_text}] 분량의 최상급 대본을 집필 중입니다..."):
+                prompt = f"{topic} 주제로 유튜브 {c_type} 대본과 이미지 프롬프트 써줘. 전체 영상 길이는 정확히 {duration_text} 내외로 맞춰줘."
+                res = model.generate_content(prompt)
+                st.session_state.last_work = {"topic": topic, "content": res.text, "len": duration_text}
+                st.markdown(res.text)
+        else: st.warning("주제를 입력해주세요.")
+
+    if 'last_work' in st.session_state:
+        if st.button("📥 프로젝트 금고에 보관"):
+            st.session_state.saved_vault.insert(0, {
+                "date": datetime.now().strftime("%m-%d %H:%M"),
+                "topic": st.session_state.last_work['topic'],
+                "content": st.session_state.last_work['content'],
+                "len": st.session_state.last_work['len']
+            })
+            st.success("✅ 보관 완료!")
+
+elif menu == "📦 저장고":
+    st.subheader("📦 프로젝트 저장고")
+    for idx, item in enumerate(st.session_state.saved_vault):
+        with st.expander(f"📌 {item['date']} | {item['topic']} ({item['len']})"):
+            st.code(item['content'])
+            if st.button("🗑️ 삭제", key=f"del_{idx}"):
+                st.session_state.saved_vault.pop(idx); st.rerun()
+
+else:
+    st.write("🔄 동기화 페이지 준비 중")
