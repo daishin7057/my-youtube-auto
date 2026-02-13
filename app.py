@@ -13,11 +13,11 @@ st.markdown("""
     section[data-testid="stSidebar"] { background-color: #0d1117 !important; border-right: 1px solid #30363d; }
     div[data-testid="stMetric"] { background: #161b22; padding: 25px; border-radius: 15px; border: 1px solid #30363d; border-left: 5px solid #3b82f6; }
     .stButton>button { width: 100%; border-radius: 8px; font-weight: 700; background: #238636; color: white; height: 3.5rem; border: none; }
-    .status-box { background: rgba(35, 134, 54, 0.1); color: #3fb950; padding: 15px; border-radius: 10px; text-align: center; font-weight: bold; border: 1px solid #238636; }
+    .status-msg { background: rgba(35, 134, 54, 0.1); color: #3fb950; padding: 15px; border-radius: 10px; text-align: center; font-weight: bold; border: 1px solid #238636; }
     </style>
     """, unsafe_allow_html=True)
 
-# [시스템 초기화]
+# [데이터 초기화]
 for key in ['fav_ai', 'history', 'api_keys']:
     if key not in st.session_state:
         st.session_state[key] = [] if key != 'api_keys' else {"Claude": "", "YouTube": ""}
@@ -35,7 +35,7 @@ with st.sidebar:
     st.title("🎬 YT Studio Master")
     menu = st.radio("🧭 NAVIGATION", ["🏠 대시보드", "✨ 콘텐츠 생성실", "🤖 AI 검색엔진", "🔄 데이터 동기화", "⚙️ 시스템 설정"])
     st.divider()
-    st.markdown("<div class='status-box'>🎉 프로그램이 정상적으로 작동합니다!</div>", unsafe_allow_html=True)
+    st.markdown("<div class='status-msg'>🎉 프로그램이 정상적으로 작동합니다!</div>", unsafe_allow_html=True)
 
 # --- 3. 핵심 페이지 구현 ---
 
@@ -59,17 +59,18 @@ if menu == "🏠 대시보드":
 
 elif menu == "✨ 콘텐츠 생성실":
     st.subheader("✨ 콘텐츠 생성 (초정밀 타임라인)")
-    c1, c2, c3 = st.columns([1, 1, 2])
+    c1, c2, col_s = st.columns([1, 1, 2])
     with c1: m = st.number_input("분 (Min)", 0, 30, 0)
-    with c2: s = st.number_input("초 (Sec)", 0, 59, 0) # 에러 차단
-    with c3: style = st.selectbox("🖼️ 스타일", ["🎬 시네마틱", "🎨 카툰", "✨ 애니메이션"])
+    with c2: s = st.number_input("초 (Sec)", 0, 59, 0) #
+    with col_s: style = st.selectbox("🖼️ 스타일", ["🎬 시네마틱", "🎨 카툰", "✨ 애니메이션"])
+    
     topic = st.text_input("콘텐츠 주제", placeholder="예: 곰이 고양이를 배신하는 스토리")
     if st.button("🚀 전체 자동 생성 가동"):
         if topic and model:
             bar = st.progress(0)
             for i in range(100): time.sleep(0.01); bar.progress(i + 1)
             try:
-                res = model.generate_content(f"{topic} 주제로 대본과 {style} 스타일 프롬프트 생성.")
+                res = model.generate_content(f"{topic} 주제로 {m}분 {s}초 대본과 {style} 스타일 프롬프트 생성.")
                 st.session_state.history.insert(0, {"topic": topic, "content": res.text, "len": f"{m}분 {s}초"})
                 st.success("✅ 생성 완료!")
                 st.write(res.text)
