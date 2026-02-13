@@ -211,6 +211,115 @@ elif menu == "📦 저장고":
             st.code(item['content'])
             if st.button("🗑️ 삭제", key=f"del_{idx}"):
                 st.session_state.saved_vault.pop(idx); st.rerun()
+                import streamlit as st
+import google.generativeai as genai
+import json
+from datetime import datetime
+
+# --- 1. 프리미엄 디자인 엔진 (심 대표님 전용 테마) ---
+st.set_page_config(page_title="YT Creator Studio Pro v7.0", layout="wide")
+
+st.markdown("""
+    <style>
+    .main { background-color: #0d1117; color: #e6edf3; }
+    .stMetric { background-color: #161b22; padding: 25px; border-radius: 15px; border: 1px solid #30363d; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
+    .ai-card { background: linear-gradient(145deg, #1c2128, #0d1117); padding: 20px; border-radius: 12px; border: 1px solid #30363d; text-align: center; transition: 0.3s; }
+    .ai-card:hover { border-color: #3b82f6; transform: translateY(-5px); }
+    .stSlider [data-baseweb="slider"] { padding-bottom: 2rem; }
+    .stButton>button { height: 3.5rem; background: #238636; color: white; border: none; font-weight: bold; font-size: 1.1rem; }
+    .stButton>button:hover { background: #2ea043; }
+    </style>
+    """, unsafe_allow_html=True)
+
+# 데이터 보관소 및 API 키 로딩
+for key in ['fav_ai', 'history', 'api_keys']:
+    if key not in st.session_state:
+        st.session_state[key] = [] if key != 'api_keys' else {"Gemini": "", "Claude": ""}
+
+if "GEMINI_API_KEY" in st.secrets:
+    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+    model = genai.GenerativeModel('gemini-1.5-flash')
+
+# --- 2. 스마트 내비게이션 ---
+with st.sidebar:
+    st.title("🎬 YT Studio Pro")
+    st.caption("대표님의 무한한 기대를 현실로.")
+    menu = st.radio("🏠 공장 구역 선택", ["대시보드", "콘텐츠 생성실", "AI 검색엔진", "동기화 & 설정"])
+    st.divider()
+    st.success("🎉 프로그램 로딩 완료! 정상 작동 중")
+
+# --- 3. 공장 구역별 기능 구현 ---
+
+# [3-1] 대시보드: 환영 메시지 및 즐겨찾기 요약 [cite: 2026-02-13]
+if menu == "대시보드":
+    st.header("🏠 대시보드")
+    st.markdown("> **🎉 환영합니다, 대표님! 모든 시스템이 정상 가동 중입니다.**") # [cite: 2026-02-13]
+    
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("⭐ 즐겨찾기", f"{len(st.session_state.fav_ai)}/8", "활성")
+    col2.metric("🎬 제작 영상", f"{len(st.session_state.history)}건", "+1")
+    col3.metric("🔄 동기화", "완료", "2026-02-13")
+    col4.metric("⏱️ 타임라인", "자유모드", "15초~30분")
+
+    st.divider()
+    st.subheader("⭐ 내 즐겨찾기 AI") # [cite: 2026-02-13]
+    if st.session_state.fav_ai:
+        cols = st.columns(4)
+        for idx, ai in enumerate(st.session_state.fav_ai):
+            cols[idx % 4].markdown(f"<div class='ai-card'><h3>{ai}</h3></div>", unsafe_allow_html=True)
+    else:
+        st.write("즐겨찾기가 비어 있습니다. 'AI 검색엔진' 구역에서 별을 눌러주세요.")
+
+# [3-2] 콘텐츠 생성실: 대표님이 원하시던 '자유 타임라인' [cite: 2026-02-13]
+elif menu == "콘텐츠 생성실":
+    st.subheader("✨ 콘텐츠 생성 (타임라인 자유 조정)")
+    
+    # 대표님만을 위한 2단계 시간 설정 [cite: 2026-02-13]
+    time_mode = st.radio("시간 설정 방식", ["간편 선택 (Presets)", "자유 입력 (Custom)"], horizontal=True)
+    
+    if time_mode == "간편 선택 (Presets)":
+        duration = st.select_slider("⏱️ 빠른 타임라인 선택", options=["15초", "30초", "60초", "3분", "5분", "10분", "30분"], value="60초")
+    else:
+        col_m, col_s = st.columns(2)
+        m = col_m.number_input("분 (Minutes)", 0, 30, 8)
+        s = col_s.number_input("초 (Seconds)", 0, 59, 30)
+        duration = f"{m}분 {s}초"
+
+    st.info(f"🎯 현재 설정된 영상 길이: **{duration}**") # [cite: 2026-02-13]
+
+    topic = st.text_input("콘텐츠 주제를 입력하세요", placeholder="예: 2차대전 탱크 복원 스토리")
+    
+    if st.button("⚡ 전체 자동 생성 가동"): # [cite: 2026-02-13]
+        if topic:
+            with st.spinner(f"[{duration}] 분량의 대본을 정밀하게 집필 중..."):
+                res = model.generate_content(f"{topic} 주제로 {duration} 분량의 유튜브 대본과 이미지 프롬프트 생성.")
+                st.session_state.history.insert(0, {"topic": topic, "len": duration, "content": res.text})
+                st.markdown("---")
+                st.write(res.text)
+        else: st.warning("주제를 입력하셔야 업무를 시작할 수 있습니다.")
+
+# [3-3] AI 검색엔진: 별 클릭 즐겨찾기 [cite: 2026-02-13]
+elif menu == "AI 검색엔진":
+    st.subheader("🤖 AI 검색엔진 (별을 클릭하여 추가)")
+    ai_list = ["Claude", "Gemini", "Grok", "ChatGPT", "Midjourney", "DALL-E 3", "Flux", "Sora"]
+    cols = st.columns(4)
+    for idx, ai in enumerate(ai_list):
+        with cols[idx % 4]:
+            is_fav = ai in st.session_state.fav_ai
+            label = f"⭐ {ai}" if is_fav else f"☆ {ai}"
+            if st.button(label, key=ai):
+                if is_fav: st.session_state.fav_ai.remove(ai)
+                elif len(st.session_state.fav_ai) < 8: st.session_state.fav_ai.append(ai)
+                st.rerun()
+
+# [3-4] 동기화 & 설정 [cite: 2026-02-13]
+else:
+    st.subheader("🔄 집/회사 데이터 동기화") # [cite: 2026-02-13]
+    st.download_button("📤 데이터 내보내기 (JSON)", data=json.dumps(st.session_state.history), file_name="yt_backup.json")
+    f = st.file_uploader("📥 데이터 가져오기", type="json")
+    if f and st.button("✅ 모든 설정 복원"):
+        st.session_state.history = json.load(f)
+        st.success("데이터가 복원되었습니다!")
 
 else:
     st.write("🔄 동기화 페이지 준비 중")
