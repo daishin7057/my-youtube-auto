@@ -262,3 +262,130 @@ elif menu == "🔄 데이터 동기화":
 
             st.markdown("---")
             st.write(item['content'])
+import streamlit as st
+import google.generativeai as genai
+import pandas as pd
+import json
+from datetime import datetime
+
+# --- 1. 페이지 및 보안 설정 ---
+st.set_page_config(page_title="YT Creator Studio Pro", layout="wide", initial_sidebar_state="expanded")
+
+# CSS: 대표님이 보내주신 이미지의 다크 테마와 카드 디자인 재현
+st.markdown("""
+    <style>
+    .main { background-color: #0e1117; color: #ffffff; }
+    .stMetric { background-color: #1e2130; padding: 15px; border-radius: 12px; border: 1px solid #3b82f6; }
+    .card { background-color: #161b22; padding: 20px; border-radius: 12px; border: 1px solid #30363d; margin-bottom: 15px; }
+    .trend-item { background: #1c2128; padding: 10px; border-radius: 8px; margin-bottom: 8px; border-left: 4px solid #f78166; }
+    .sidebar .sidebar-content { background-image: linear-gradient(#161b22, #0e1117); }
+    </style>
+    """, unsafe_allow_html=True)
+
+if "GEMINI_API_KEY" in st.secrets:
+    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+    model = genai.GenerativeModel('gemini-1.5-flash')
+else:
+    st.error("보안 설정(Secrets)에 API 키가 없습니다.")
+
+# 데이터 저장소 초기화
+for key in ['saved_vault', 'fav_ai']:
+    if key not in st.session_state: st.session_state[key] = []
+
+# --- 2. 사이드바 내비게이션 (이미지 구성 재현) ---
+with st.sidebar:
+    st.title("🎬 YT Studio Pro")
+    st.caption("AI 영상 자동화 플랫폼")
+    menu = st.radio("메인 메뉴", ["🏠 대시보드", "🔥 트렌드 분석", "✨ 콘텐츠 생성", "⚙️ 9단계 파이프라인", "📂 내 프로젝트", "🤖 AI 검색엔진", "🔄 데이터 동기화"])
+    st.divider()
+    st.info(f"서버 상태: ✅ 온라인\n접속 시각: {datetime.now().strftime('%H:%M:%S')}")
+
+# --- 3. 각 페이지별 기능 구현 ---
+
+# [3-1] 대시보드 (지표 카드 및 트렌드 리스트)
+if menu == "🏠 대시보드":
+    st.header("대시보드")
+    
+    # 상단 요약 지표 카드 (image_a374a0.png 재현)
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("📊 트렌드 키워드", "847", "↑ 실시간")
+    col2.metric("🎬 생성 완료 영상", "24", "↑ 이번 달 +8")
+    col3.metric("⚡ 파이프라인", "Step 3/9", "진행 중")
+    col4.metric("🔥 핫 트렌드", "18건", "↑ 100만+ 조회")
+
+    st.divider()
+
+    mid_col1, mid_col2 = st.columns([1.5, 1])
+    
+    with mid_col1:
+        st.subheader("🔥 실시간 핫 트렌드 (100만+ 조회)")
+        trends = [
+            {"rank": 1, "title": "고양이가 스시 만드는 법 (진짜임)", "views": "4,230만", "tag": "쇼츠"},
+            {"rank": 2, "title": "폐허 속에서 발견한 비밀 지하 도시", "views": "3,870만", "tag": "롱폼"},
+            {"rank": 3, "title": "AI로 만든 완벽한 로맨스 영화 60초", "views": "2,940만", "tag": "쇼츠"}
+        ]
+        for t in trends:
+            st.markdown(f"""
+            <div class="trend-item">
+                <b>{t['rank']}. {t['title']}</b><br>
+                <small>조회수: {t['views']} | 유형: {t['tag']}</small>
+            </div>
+            """, unsafe_allow_html=True)
+            
+    with mid_col2:
+        st.subheader("⚙️ 파이프라인 현황")
+        steps = ["트렌드 분석", "주제 확정", "대본 생성", "이미지 프롬프트", "이미지 생성", "음성 합성(TTS)", "영상 편집", "최종 검수", "자동 업로드"]
+        for i, step in enumerate(steps):
+            status = "✅" if i < 2 else ("⏳" if i == 2 else "⚪")
+            st.write(f"{status} {i+1}. {step}")
+
+# [3-2] 콘텐츠 생성 및 저장고 기능
+elif menu == "✨ 콘텐츠 생성":
+    st.subheader("🎯 맞춤형 콘텐츠 기획")
+    with st.container():
+        duration = st.select_slider("영상 길이", options=["15초", "60초", "3분", "10분", "30분"], value="60초")
+        topic = st.text_input("주제", placeholder="예: 2차대전 탱크 복원 스토리")
+        
+        if st.button("🚀 AI 보좌관 가동"):
+            if topic:
+                with st.spinner("AI가 정교한 대본을 생성 중입니다..."):
+                    res = model.generate_content(f"{topic} 주제로 {duration} 분량의 대본과 이미지 프롬프트 써줘.")
+                    st.session_state.last_res = {"topic": topic, "content": res.text}
+                    st.markdown(res.text)
+            else: st.warning("주제를 입력하세요.")
+
+    if 'last_res' in st.session_state:
+        st.divider()
+        video_url = st.text_input("🔗 완성 영상 링크 저장", placeholder="https://youtube.com/...")
+        if st.button("📥 내 프로젝트에 영구 보관"):
+            st.session_state.saved_vault.insert(0, {
+                "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                "topic": st.session_state.last_res['topic'],
+                "content": st.session_state.last_res['content'],
+                "url": video_url if video_url else "링크 없음"
+            })
+            st.success("대표님 전용 금고에 저장되었습니다!")
+
+# [3-3] AI 검색엔진 (퀵 액세스 카드)
+elif menu == "🤖 AI 검색엔진":
+    st.subheader("🤖 AI 검색엔진 빠른 접속")
+    cols = st.columns(4)
+    ai_list = [("Claude", "Anthropic"), ("Gemini", "Google"), ("Grok", "xAI"), ("ChatGPT", "OpenAI")]
+    for i, (name, prov) in enumerate(ai_list):
+        with cols[i % 4]:
+            st.markdown(f"""
+            <div style="background:#1e2130; padding:20px; border-radius:10px; text-align:center;">
+                <h3>{name}</h3><p>{prov}</p>
+            </div>
+            """, unsafe_allow_html=True)
+            st.button(f"접속 {name}", key=f"btn_{name}")
+
+# [3-4] 데이터 동기화
+elif menu == "🔄 데이터 동기화":
+    st.subheader("🔄 집/회사 데이터 동기화")
+    data_str = json.dumps({"vault": st.session_state.saved_vault}, indent=4)
+    st.download_button("📤 데이터 내보내기 (JSON)", data=data_str, file_name="yt_studio_pro_backup.json")
+    file = st.file_uploader("📥 데이터 가져오기", type="json")
+    if file and st.button("✅ 데이터 복원"):
+        st.session_state.saved_vault = json.load(file).get("vault", [])
+        st.success("모든 설정과 저장물이 복원되었습니다!")
